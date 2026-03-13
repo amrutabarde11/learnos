@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { logSession } from '../api/data';
 import Quiz from './Quiz';
 
-const API = 'http://localhost:8080/api';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 const MASTERY_LEVELS = ['UNAWARE','EXPOSED','FAMILIAR','COMPETENT','PROFICIENT','MASTERED'];
 const SESSION_TYPES = ['STUDY','PRACTICE','REVISION','ASSESSMENT'];
 const MASTERY_COLORS = {
@@ -13,7 +12,7 @@ const MASTERY_COLORS = {
 export default function LogSession({ user, onSessionLogged }) {
   const goals = user?.goals || [];
   const [form, setForm] = useState({ goalId:'', topic:'', duration:1, sessionType:'STUDY', masteryBefore:'FAMILIAR', masteryAfter:'FAMILIAR', notes:'' });
-  const [phase, setPhase] = useState('form');
+  const [phase, setPhase] = useState('form'); // form | success | quiz
   const [saving, setSaving] = useState(false);
   const [leiResult, setLeiResult] = useState(null);
   const [sessionData, setSessionData] = useState(null);
@@ -38,11 +37,25 @@ export default function LogSession({ user, onSessionLogged }) {
       });
       const result = await r.json();
       if (result?.lei) setLeiResult(result.lei);
-      setSessionData({ topic: form.topic, goalTitle: selectedGoal?.title, mastery: form.masteryAfter, duration: form.duration, sessionType: form.sessionType });
+      setSessionData({
+        topic: form.topic,
+        goalTitle: selectedGoal?.title,
+        mastery: form.masteryAfter,
+        duration: form.duration,
+        sessionType: form.sessionType
+      });
+      // ✅ Set phase to success FIRST — do NOT call onSessionLogged here
+      // onSessionLogged is called only when user leaves the success/quiz screen
       setPhase('success');
-      if (onSessionLogged) onSessionLogged();
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+    }
     setSaving(false);
+  };
+
+  const handleDone = () => {
+    // Called when user clicks "Back to Dashboard" or "Skip for now"
+    if (onSessionLogged) onSessionLogged(); // NOW navigate + refresh dashboard
   };
 
   const resetForm = () => {
@@ -74,11 +87,19 @@ export default function LogSession({ user, onSessionLogged }) {
             Gemini will generate 3 questions on <strong>{sessionData?.topic}</strong> to reinforce what you just studied.
           </p>
           <div style={{ display:'flex', gap:10 }}>
-            <button onClick={() => setPhase('quiz')} style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background:'#1B2A4A', color:'white', fontSize:14, fontFamily:'inherit', fontWeight:600, cursor:'pointer' }}>Take Quiz ✦</button>
-            <button onClick={resetForm} style={{ flex:1, padding:'13px', borderRadius:12, border:'1.5px solid rgba(27,42,74,0.15)', background:'transparent', color:'#5A6A80', fontSize:14, fontFamily:'inherit', cursor:'pointer' }}>Skip for now</button>
+            <button onClick={() => setPhase('quiz')}
+              style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background:'#1B2A4A', color:'white', fontSize:14, fontFamily:'inherit', fontWeight:600, cursor:'pointer' }}>
+              Take Quiz ✦
+            </button>
+            <button onClick={handleDone}
+              style={{ flex:1, padding:'13px', borderRadius:12, border:'1.5px solid rgba(27,42,74,0.15)', background:'transparent', color:'#5A6A80', fontSize:14, fontFamily:'inherit', cursor:'pointer' }}>
+              Skip for now
+            </button>
           </div>
         </div>
-        <button onClick={resetForm} style={{ border:'none', background:'none', color:'var(--text-muted)', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Log another session</button>
+        <button onClick={() => { resetForm(); }} style={{ border:'none', background:'none', color:'var(--text-muted)', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+          Log another session
+        </button>
       </div>
     );
   }
@@ -90,7 +111,13 @@ export default function LogSession({ user, onSessionLogged }) {
           <h1 className="page-greeting">Quick <em>Quiz</em></h1>
           <p className="page-subtitle">AI-generated questions on {sessionData?.topic}</p>
         </div>
-        <Quiz topic={sessionData?.topic} goalTitle={sessionData?.goalTitle} mastery={sessionData?.mastery} onFinish={resetForm} onSkip={resetForm} />
+        <Quiz
+          topic={sessionData?.topic}
+          goalTitle={sessionData?.goalTitle}
+          mastery={sessionData?.mastery}
+          onFinish={handleDone}
+          onSkip={handleDone}
+        />
       </div>
     );
   }
@@ -131,7 +158,8 @@ export default function LogSession({ user, onSessionLogged }) {
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">Duration (hours)</label>
-            <input type="number" step="0.5" min="0.5" max="8" className="form-input" value={form.duration} onChange={e => setForm({...form, duration:parseFloat(e.target.value)})} />
+            <input type="number" step="0.5" min="0.5" max="8" className="form-input" value={form.duration}
+              onChange={e => setForm({...form, duration:parseFloat(e.target.value)})} />
           </div>
           <div className="form-group">
             <label className="form-label">Session Type</label>
@@ -146,7 +174,9 @@ export default function LogSession({ user, onSessionLogged }) {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20 }}>
             {MASTERY_LEVELS.map(m => (
               <button key={m} onClick={() => setForm({...form, masteryBefore:m})}
-                style={{ padding:'8px 14px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, transition:'all 0.2s', fontFamily:'inherit', background:form.masteryBefore===m?MASTERY_COLORS[m]:'var(--cream-dark)', color:form.masteryBefore===m?'white':'var(--text-muted)' }}>
+                style={{ padding:'8px 14px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit', transition:'all 0.2s',
+                  background:form.masteryBefore===m?MASTERY_COLORS[m]:'var(--cream-dark)',
+                  color:form.masteryBefore===m?'white':'var(--text-muted)' }}>
                 {m}
               </button>
             ))}
@@ -155,7 +185,9 @@ export default function LogSession({ user, onSessionLogged }) {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {MASTERY_LEVELS.map(m => (
               <button key={m} onClick={() => setForm({...form, masteryAfter:m})}
-                style={{ padding:'8px 14px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, transition:'all 0.2s', fontFamily:'inherit', background:form.masteryAfter===m?MASTERY_COLORS[m]:'var(--cream-dark)', color:form.masteryAfter===m?'white':'var(--text-muted)' }}>
+                style={{ padding:'8px 14px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'inherit', transition:'all 0.2s',
+                  background:form.masteryAfter===m?MASTERY_COLORS[m]:'var(--cream-dark)',
+                  color:form.masteryAfter===m?'white':'var(--text-muted)' }}>
                 {m}
               </button>
             ))}
@@ -163,7 +195,8 @@ export default function LogSession({ user, onSessionLogged }) {
         </div>
         <div className="form-group">
           <label className="form-label">Notes (optional)</label>
-          <textarea className="form-textarea" placeholder="What clicked? What's still confusing?" value={form.notes} onChange={e => setForm({...form, notes:e.target.value})} />
+          <textarea className="form-textarea" placeholder="What clicked? What's still confusing?"
+            value={form.notes} onChange={e => setForm({...form, notes:e.target.value})} />
         </div>
         <button className="btn btn-primary" style={{ width:'100%' }} onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Session ✦'}
