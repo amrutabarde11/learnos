@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API = 'http://localhost:8080/api';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 export default function Quiz({ topic, goalTitle, mastery, onFinish, onSkip }) {
   const [phase, setPhase] = useState('loading'); // loading | quiz | result

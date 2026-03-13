@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logSession } from '../api/data';
 import Quiz from './Quiz';
 
 const API = 'http://localhost:8080/api';

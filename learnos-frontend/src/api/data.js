@@ -1,6 +1,6 @@
 // api/data.js — API client + mock fallbacks
 
-const API_BASE = 'https://learnos-production.up.railway.app/api';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 // ── Mock fallbacks (used only if backend is down) ──────────────
 export const mockUser = {
