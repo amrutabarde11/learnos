@@ -31,7 +31,10 @@ function AppInner() {
     clerkId: user?.id,
   };
 
-  const handleSessionLogged = () => setRefreshKey(k => k + 1);
+  const handleSessionLogged = () => {
+    setRefreshKey(k => k + 1);
+    setPage('dashboard');
+  };
 
   const renderPage = () => {
     switch (page) {
@@ -56,14 +59,10 @@ export default function App() {
   return (
     <>
       <SignedOut>
-        <div style={{
-          minHeight: '100vh', background: '#F7F3EC',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: "'DM Sans', sans-serif"
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, color: '#1B2A4A', marginBottom: 4 }}>LearnOS</div>
-            <div style={{ fontSize: 13, color: '#8A9AB0', marginBottom: 32 }}>Your personal learning intelligence</div>
+        <div style={{ minHeight:'100vh', background:'#F7F3EC', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'DM Sans', sans-serif" }}>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:36, color:'#1B2A4A', marginBottom:4 }}>LearnOS</div>
+            <div style={{ fontSize:13, color:'#8A9AB0', marginBottom:32 }}>Your personal learning intelligence</div>
             <SignIn routing="hash" />
           </div>
         </div>

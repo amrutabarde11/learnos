@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 const API = 'http://localhost:8080/api';
 
-const MOCK_LEI = { score:0, risk:'HIGH', productivity:0, mastery:0, retention:0, topicPriority:0, deadline:0, goalProgress:0, cognitive:100, motivation:50 };
-const MOCK_INSIGHTS = [
+const mockLEI = { score:0, risk:'HIGH', productivity:0, mastery:0, retention:0, topicPriority:0, deadline:0, goalProgress:0, cognitive:100, motivation:50 };
+const mockInsights = [
   { id:1, type:'STREAK', severity:'info', message:'Welcome to LearnOS! Log your first session to start tracking your progress.' },
   { id:2, type:'GOAL_RISK', severity:'warning', message:'Add topics to your goals so the system can track your mastery over time.' },
 ];
@@ -40,16 +40,17 @@ function ProgressRing({ value, size=64, stroke=5, color='#7A9E87' }) {
 
 export default function Dashboard({ user, refreshKey }) {
   const [greeting, setGreeting] = useState('');
-  const [lei, setLei] = useState(MOCK_LEI);
-  const [insights, setInsights] = useState(MOCK_INSIGHTS);
+  const [lei, setLei] = useState(mockLEI);
+  const [insights, setInsights] = useState(mockInsights);
   const goals = user?.goals || [];
+  const userId = user?.clerkId || 'anonymous';
 
   useEffect(() => {
     const h = new Date().getHours();
     setGreeting(h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening');
-    fetch(`${API}/sessions/lei`).then(r => r.json()).then(setLei).catch(() => {});
-    fetch(`${API}/sessions/insights`).then(r => r.json()).then(setInsights).catch(() => {});
-  }, [refreshKey]);
+    fetch(`${API}/sessions/lei?userId=${userId}`).then(r => r.json()).then(setLei).catch(() => {});
+    fetch(`${API}/sessions/insights?userId=${userId}`).then(r => r.json()).then(setInsights).catch(() => {});
+  }, [refreshKey, userId]);
 
   const riskClass = lei.score >= 75 ? 'low' : lei.score >= 50 ? 'medium' : 'high';
   const numClass = lei.score >= 75 ? 'green' : lei.score >= 50 ? 'yellow' : 'red';
