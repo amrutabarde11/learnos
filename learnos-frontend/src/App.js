@@ -6,32 +6,28 @@ import LogSession from './pages/LogSession';
 import Reports from './pages/Reports';
 import MasteryMap from './pages/MasteryMap';
 import Sidebar from './components/Sidebar';
+import { mockGoals } from './api/data';
 import './App.css';
 
-// ── Onboarding wizard shown to first-time users ──────────────────────────────
-const MASTERY_LEVELS = ['UNAWARE','EXPOSED','FAMILIAR','COMPETENT','PROFICIENT','MASTERED'];
 const CATEGORIES = ['ACADEMIC','SKILL','CERTIFICATION','KNOWLEDGE'];
+const MASTERY_LEVELS = ['UNAWARE','EXPOSED','FAMILIAR','COMPETENT','PROFICIENT','MASTERED'];
 
 function Onboarding({ clerkUser, onComplete }) {
-  const [step, setStep] = useState(1); // 1=profile, 2=first goal, 3=topics
+  const [step, setStep] = useState(1);
   const [name, setName] = useState(clerkUser?.firstName || '');
   const [learnerType, setLearnerType] = useState('BOTH');
   const [dailyTarget, setDailyTarget] = useState(2);
   const [goal, setGoal] = useState({ title:'', category:'ACADEMIC', why:'', deadline:'', targetMastery:'COMPETENT' });
   const [topics, setTopics] = useState([{ name:'', mastery:'UNAWARE' }]);
-  const [saving, setSaving] = useState(false);
 
   const addTopic = () => setTopics([...topics, { name:'', mastery:'UNAWARE' }]);
-  const updateTopic = (i, field, val) => {
-    const t = [...topics]; t[i] = { ...t[i], [field]: val }; setTopics(t);
-  };
+  const updateTopic = (i, field, val) => { const t = [...topics]; t[i] = { ...t[i], [field]: val }; setTopics(t); };
   const removeTopic = (i) => setTopics(topics.filter((_,idx) => idx !== i));
 
-  const handleFinish = async () => {
-    setSaving(true);
+  const handleFinish = () => {
     const validTopics = topics.filter(t => t.name.trim());
     const firstGoal = {
-      id: Date.now(),
+      id: 1,
       title: goal.title || 'My First Goal',
       category: goal.category,
       why: goal.why,
@@ -46,31 +42,30 @@ function Onboarding({ clerkUser, onComplete }) {
       dailyTarget,
       goals: [firstGoal]
     };
-    // Save to localStorage keyed by clerkId
     localStorage.setItem(`learnos_user_${clerkUser?.id}`, JSON.stringify(userData));
-    setSaving(false);
     onComplete(userData);
   };
 
-  const s = { maxWidth:520, margin:'0 auto', padding:'40px 20px' };
   const inputStyle = { width:'100%', padding:'10px 14px', borderRadius:10, border:'1.5px solid rgba(27,42,74,0.15)', background:'white', fontFamily:'inherit', fontSize:14, color:'#1B2A4A', boxSizing:'border-box', outline:'none' };
   const btnPrimary = { padding:'13px 28px', borderRadius:12, border:'none', background:'#1B2A4A', color:'white', fontSize:15, fontFamily:'inherit', fontWeight:600, cursor:'pointer' };
   const btnOutline = { padding:'13px 28px', borderRadius:12, border:'1.5px solid rgba(27,42,74,0.2)', background:'transparent', color:'#5A6A80', fontSize:15, fontFamily:'inherit', cursor:'pointer' };
+  const wrap = { minHeight:'100vh', background:'#F7F3EC', display:'flex', alignItems:'center', justifyContent:'center' };
+  const card = { background:'white', borderRadius:20, padding:32, boxShadow:'0 4px 32px rgba(27,42,74,0.08)', maxWidth:520, width:'100%' };
 
   if (step === 1) return (
-    <div style={{ minHeight:'100vh', background:'#F7F3EC', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={s}>
-        <div style={{ textAlign:'center', marginBottom:36 }}>
+    <div style={wrap}>
+      <div style={{ maxWidth:520, width:'100%', padding:'0 20px' }}>
+        <div style={{ textAlign:'center', marginBottom:32 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontSize:32, color:'#1B2A4A', marginBottom:6 }}>Welcome to LearnOS</div>
           <div style={{ color:'#8A9AB0', fontSize:14 }}>Let's set you up. Takes 2 minutes.</div>
         </div>
-        <div style={{ background:'white', borderRadius:20, padding:32, boxShadow:'0 4px 32px rgba(27,42,74,0.08)' }}>
+        <div style={card}>
           <div style={{ marginBottom:20 }}>
             <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#5A6A80', textTransform:'uppercase', letterSpacing:'1px', marginBottom:8 }}>What should we call you?</label>
             <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
           </div>
           <div style={{ marginBottom:20 }}>
-            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#5A6A80', textTransform:'uppercase', letterSpacing:'1px', marginBottom:8 }}>How do you learn best?</label>
+            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#5A6A80', textTransform:'uppercase', letterSpacing:'1px', marginBottom:8 }}>How do you learn?</label>
             {['VISUAL','READING','BOTH'].map(t => (
               <button key={t} onClick={() => setLearnerType(t)}
                 style={{ marginRight:8, marginBottom:8, padding:'8px 18px', borderRadius:20, border:'none', cursor:'pointer', fontSize:13, fontFamily:'inherit', fontWeight:600,
@@ -91,25 +86,23 @@ function Onboarding({ clerkUser, onComplete }) {
               ))}
             </div>
           </div>
-          <button style={{ ...btnPrimary, width:'100%' }} onClick={() => setStep(2)}>
-            Continue →
-          </button>
+          <button style={{ ...btnPrimary, width:'100%' }} onClick={() => setStep(2)} disabled={!name.trim()}>Continue →</button>
         </div>
       </div>
     </div>
   );
 
   if (step === 2) return (
-    <div style={{ minHeight:'100vh', background:'#F7F3EC', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={s}>
-        <div style={{ textAlign:'center', marginBottom:36 }}>
+    <div style={wrap}>
+      <div style={{ maxWidth:520, width:'100%', padding:'0 20px' }}>
+        <div style={{ textAlign:'center', marginBottom:32 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28, color:'#1B2A4A', marginBottom:6 }}>Your first learning goal</div>
           <div style={{ color:'#8A9AB0', fontSize:14 }}>You can add more later</div>
         </div>
-        <div style={{ background:'white', borderRadius:20, padding:32, boxShadow:'0 4px 32px rgba(27,42,74,0.08)' }}>
+        <div style={card}>
           <div style={{ marginBottom:18 }}>
             <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#5A6A80', textTransform:'uppercase', letterSpacing:'1px', marginBottom:8 }}>Goal title</label>
-            <input style={inputStyle} value={goal.title} onChange={e => setGoal({...goal, title:e.target.value})} placeholder="e.g. Learn React, Master DSA, AWS Cert..." />
+            <input style={inputStyle} value={goal.title} onChange={e => setGoal({...goal, title:e.target.value})} placeholder="e.g. Learn React, Master DSA..." />
           </div>
           <div style={{ marginBottom:18 }}>
             <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#5A6A80', textTransform:'uppercase', letterSpacing:'1px', marginBottom:8 }}>Category</label>
@@ -141,42 +134,36 @@ function Onboarding({ clerkUser, onComplete }) {
           </div>
           <div style={{ display:'flex', gap:12 }}>
             <button style={btnOutline} onClick={() => setStep(1)}>← Back</button>
-            <button style={{ ...btnPrimary, flex:1 }} onClick={() => setStep(3)} disabled={!goal.title.trim()}>
-              Add Topics →
-            </button>
+            <button style={{ ...btnPrimary, flex:1 }} onClick={() => setStep(3)} disabled={!goal.title.trim()}>Add Topics →</button>
           </div>
         </div>
       </div>
     </div>
   );
 
-  if (step === 3) return (
-    <div style={{ minHeight:'100vh', background:'#F7F3EC', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={s}>
-        <div style={{ textAlign:'center', marginBottom:36 }}>
+  return (
+    <div style={wrap}>
+      <div style={{ maxWidth:520, width:'100%', padding:'0 20px' }}>
+        <div style={{ textAlign:'center', marginBottom:32 }}>
           <div style={{ fontFamily:"'Playfair Display',serif", fontSize:28, color:'#1B2A4A', marginBottom:6 }}>Topics in "{goal.title}"</div>
           <div style={{ color:'#8A9AB0', fontSize:14 }}>What specific topics does this goal cover?</div>
         </div>
-        <div style={{ background:'white', borderRadius:20, padding:32, boxShadow:'0 4px 32px rgba(27,42,74,0.08)' }}>
+        <div style={card}>
           {topics.map((t, i) => (
             <div key={i} style={{ display:'flex', gap:10, marginBottom:12, alignItems:'center' }}>
-              <input style={{ ...inputStyle, flex:2 }} value={t.name} onChange={e => updateTopic(i,'name',e.target.value)} placeholder={`Topic ${i+1}, e.g. Arrays`} />
+              <input style={{ ...inputStyle, flex:2 }} value={t.name} onChange={e => updateTopic(i,'name',e.target.value)} placeholder={`Topic ${i+1}`} />
               <select style={{ ...inputStyle, flex:1 }} value={t.mastery} onChange={e => updateTopic(i,'mastery',e.target.value)}>
                 {MASTERY_LEVELS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               {topics.length > 1 && (
-                <button onClick={() => removeTopic(i)} style={{ padding:'8px 12px', borderRadius:8, border:'none', background:'#F0EBE0', color:'#C9857A', cursor:'pointer', fontSize:16, fontFamily:'inherit' }}>✕</button>
+                <button onClick={() => removeTopic(i)} style={{ padding:'8px 12px', borderRadius:8, border:'none', background:'#F0EBE0', color:'#C9857A', cursor:'pointer', fontSize:16 }}>✕</button>
               )}
             </div>
           ))}
-          <button onClick={addTopic} style={{ ...btnOutline, width:'100%', marginBottom:24, fontSize:13 }}>
-            + Add another topic
-          </button>
+          <button onClick={addTopic} style={{ ...btnOutline, width:'100%', marginBottom:24, fontSize:13 }}>+ Add topic</button>
           <div style={{ display:'flex', gap:12 }}>
             <button style={btnOutline} onClick={() => setStep(2)}>← Back</button>
-            <button style={{ ...btnPrimary, flex:1 }} onClick={handleFinish} disabled={saving}>
-              {saving ? 'Setting up...' : "Let's go ✦"}
-            </button>
+            <button style={{ ...btnPrimary, flex:1 }} onClick={handleFinish}>Let's go ✦</button>
           </div>
         </div>
       </div>
@@ -184,48 +171,37 @@ function Onboarding({ clerkUser, onComplete }) {
   );
 }
 
-// ── Main app ──────────────────────────────────────────────────────────────────
 function AppInner() {
   const { user } = useUser();
   const [page, setPage] = useState('dashboard');
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('learnos_dark') === 'true');
   const [refreshKey, setRefreshKey] = useState(0);
   const [appUser, setAppUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) return;
-    // Check localStorage for existing user data
-   const stored = localStorage.getItem(`learnos_user_${user.id}`);
-   if (stored) {
-     setAppUser(JSON.parse(stored));
-   } else {
-     // Default user with all 3 goals for existing users
-     setAppUser({
-       userId: user.id,
-       name: user.firstName || 'Learner',
-       learnerType: 'BOTH',
-       dailyTarget: 2,
-       goals: [
-         { id: 1, title: 'Data Structures & Algorithms', category: 'ACADEMIC', why: 'Crack placements', deadline: '2026-05-01', targetMastery: 'PROFICIENT',
-           topics: [{name:'Arrays',mastery:'COMPETENT'},{name:'Linked Lists',mastery:'FAMILIAR'},{name:'Trees & BST',mastery:'EXPOSED'},{name:'Graphs',mastery:'UNAWARE'},{name:'Dynamic Programming',mastery:'UNAWARE'}]},
-         { id: 2, title: 'Learn React', category: 'SKILL', why: 'Build real projects', deadline: '2026-04-01', targetMastery: 'COMPETENT',
-           topics: [{name:'Hooks',mastery:'FAMILIAR'},{name:'State Management',mastery:'EXPOSED'},{name:'Routing',mastery:'COMPETENT'},{name:'API Integration',mastery:'FAMILIAR'}]},
-         { id: 3, title: 'AWS Cloud Practitioner', category: 'CERTIFICATION', why: 'Add cloud skills', deadline: '2026-06-01', targetMastery: 'COMPETENT',
-           topics: [{name:'Core Services',mastery:'EXPOSED'},{name:'IAM & Security',mastery:'UNAWARE'},{name:'Pricing & Billing',mastery:'UNAWARE'}]}
-       ]
-     });
-   }
-   setLoading(false);
+    const stored = localStorage.getItem(`learnos_user_${user.id}`);
+    if (stored) {
+      setAppUser(JSON.parse(stored));
+    }
+    setLoading(false);
   }, [user?.id]);
 
-  const handleOnboardingComplete = (userData) => {
-    setAppUser(userData);
+  const toggleDark = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem('learnos_dark', String(next));
   };
 
   const handleSessionLogged = () => {
     setRefreshKey(k => k + 1);
     setPage('dashboard');
+  };
+
+  const handleUpdateUser = (updated) => {
+    setAppUser(updated);
+    localStorage.setItem(`learnos_user_${user.id}`, JSON.stringify(updated));
   };
 
   if (loading) return (
@@ -234,13 +210,12 @@ function AppInner() {
     </div>
   );
 
-  // First time user — show onboarding
-  if (!appUser) return <Onboarding clerkUser={user} onComplete={handleOnboardingComplete} />;
+  if (!appUser) return <Onboarding clerkUser={user} onComplete={setAppUser} />;
 
   const renderPage = () => {
     switch (page) {
       case 'dashboard': return <Dashboard user={appUser} refreshKey={refreshKey} />;
-      case 'goals':     return <Goals user={appUser} />;
+      case 'goals':     return <Goals user={appUser} onUpdateUser={handleUpdateUser} />;
       case 'log':       return <LogSession user={appUser} onSessionLogged={handleSessionLogged} />;
       case 'mastery':   return <MasteryMap user={appUser} />;
       case 'reports':   return <Reports user={appUser} />;
@@ -250,7 +225,8 @@ function AppInner() {
 
   return (
     <div className={`app-root ${darkMode ? 'dark' : ''}`}>
-      <Sidebar page={page} setPage={setPage} darkMode={darkMode} setDarkMode={setDarkMode} user={appUser} onReset={null} />
+      <Sidebar page={page} setPage={setPage} darkMode={darkMode} setDarkMode={toggleDark} user={appUser}
+        onReset={() => { localStorage.removeItem(`learnos_user_${user.id}`); setAppUser(null); }} />
       <main className="main-content">{renderPage()}</main>
     </div>
   );
