@@ -63,14 +63,89 @@ public class SessionController {
                 : sessionRepository.findAll();
 
         List<Map<String, Object>> insights = new ArrayList<>();
-        Map<String, Object> insight = new HashMap<>();
-        insight.put("id", 1);
-        insight.put("type", "INFO");
-        insight.put("severity", "info");
-        insight.put("message", "Total sessions logged: " + sessions.size() + ". LEI updates with every session.");
-        insights.add(insight);
+        int id = 1;
+
+        if (sessions.isEmpty()) {
+            insights.add(insight(id++, "INFO", "info", "No sessions yet. Log your first study session to get personalized insights."));
+            return insights;
+        }
+
+        // --- Streak detection ---
+        Set<LocalDate> dates = new HashSet<>();
+        for (SessionEntity s : sessions) if (s.getDate() != null) dates.add(s.getDate());
+        int streak = 0;
+        LocalDate check = LocalDate.now();
+        while (dates.contains(check)) { streak++; check = check.minusDays(1); }
+        if (streak >= 3) insights.add(insight(id++, "MOTIVATION", "success", "🔥 " + streak + "-day streak! Consistency is your biggest advantage right now."));
+
+        // --- Inactivity warning ---
+        Optional<LocalDate> lastDate = dates.stream().max(Comparator.naturalOrder());
+        if (lastDate.isPresent()) {
+            long daysSince = java.time.temporal.ChronoUnit.DAYS.between(lastDate.get(), LocalDate.now());
+            if (daysSince >= 3 && daysSince < 7)
+                insights.add(insight(id++, "RETENTION", "warning", "⚠️ " + daysSince + " days since your last session. Retention drops sharply after 72 hours — log something today."));
+            else if (daysSince >= 7)
+                insights.add(insight(id++, "RETENTION", "danger", "🚨 " + daysSince + " days inactive. You're likely losing what you learned. Even a 15-min review session helps."));
+        }
+
+        // --- Mastery stagnation ---
+        Map<String, Integer> masteryOrder = Map.of(
+                "UNAWARE", 0, "EXPOSED", 1, "FAMILIAR", 2,
+                "COMPETENT", 3, "PROFICIENT", 4, "MASTERED", 5
+        );
+        long stagnantSessions = sessions.stream().filter(s -> {
+            int before = masteryOrder.getOrDefault(s.getMasteryBefore(), 0);
+            int after  = masteryOrder.getOrDefault(s.getMasteryAfter(), 0);
+            return after <= before;
+        }).count();
+        double stagnantRatio = (double) stagnantSessions / sessions.size();
+        if (stagnantRatio > 0.6 && sessions.size() >= 3)
+            insights.add(insight(id++, "MASTERY", "warning", "📉 " + (int)(stagnantRatio*100) + "% of your sessions show no mastery gain. Try harder problems, teach the concept, or switch methods."));
+
+        // --- Topic overload ---
+        Map<String, Long> topicCounts = new HashMap<>();
+        for (SessionEntity s : sessions) {
+            if (s.getTopic() != null && !s.getTopic().isBlank())
+                topicCounts.merge(s.getTopic(), 1L, Long::sum);
+        }
+        if (topicCounts.size() > 5)
+            insights.add(insight(id++, "FOCUS", "warning", "🧠 You're spreading across " + topicCounts.size() + " topics. Focus on 2-3 at a time for deeper mastery."));
+
+        // --- Most neglected topic ---
+        if (topicCounts.size() >= 3) {
+            topicCounts.entrySet().stream()
+                    .min(Map.Entry.comparingByValue())
+                    .ifPresent(e -> insights.add(insight(
+                            insights.size() + 1,
+                            "TOPIC_PRIORITY",
+                            "info",
+                            "📌 \"" + e.getKey() + "\" has the fewest sessions (" + e.getValue() + "). Consider revisiting it before moving on."
+                    )));
+        }
+
+        // --- Session length nudge ---
+        double avgDuration = sessions.stream().mapToDouble(SessionEntity::getDuration).average().orElse(0);
+        if (avgDuration < 0.5)
+            insights.add(insight(id++, "PRODUCTIVITY", "warning", "⏱ Average session is under 30 min. Short sessions are fine for review, but deeper learning needs at least 45-60 min blocks."));
+        else if (avgDuration > 3)
+            insights.add(insight(id++, "COGNITIVE", "warning", "😓 Average session exceeds 3 hours. Long sessions hurt retention — try splitting into focused blocks with breaks."));
+
+        // --- Positive milestone ---
+        if (sessions.size() == 10 || sessions.size() == 25 || sessions.size() == 50 || sessions.size() == 100)
+            insights.add(insight(id++, "MILESTONE", "success", "🎉 " + sessions.size() + " sessions logged! You're building a real learning habit."));
+
         return insights;
     }
+
+    private Map<String, Object> insight(int id, String type, String severity, String message) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", id);
+        m.put("type", type);
+        m.put("severity", severity);
+        m.put("message", message);
+        return m;
+    }
+
 
     @DeleteMapping
     public Map<String, Object> clearSessions(@RequestParam(required = false) String userId) {
