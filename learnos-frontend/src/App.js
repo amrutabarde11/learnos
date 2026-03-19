@@ -185,15 +185,16 @@ function AppInner() {
   const [appUser, setAppUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-   useEffect(async () => {
-    if (!user?.id) return;
+
+useEffect(() => {
+  if (!user?.id) return;
+  const fetchUser = async () => {
     const stored = localStorage.getItem(`learnos_user_${user.id}`);
     if (stored) {
       setAppUser(JSON.parse(stored));
       setLoading(false);
       return;
     }
-    // Not in localStorage — try backend (new device)
     try {
       const r = await fetch((process.env.REACT_APP_API_URL || 'http://localhost:8080/api') + `/users/me?userId=${user.id}`);
       const data = await r.json();
@@ -203,7 +204,9 @@ function AppInner() {
       }
     } catch(e) { console.error(e); }
     setLoading(false);
-  }, [user?.id]);
+  };
+  fetchUser();
+}, [user?.id]);
 
   const toggleDark = () => {
     const next = !darkMode;
