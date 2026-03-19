@@ -1,3 +1,4 @@
+import { mockInsights, mockLEI, getLEI, getInsights } from '../api/data';
 import React, { useState, useEffect } from 'react';
 import { getLEI, getInsights, mockLEI, mockInsights } from '../api/data';
 
@@ -37,16 +38,17 @@ export default function Dashboard({ user, refreshKey }) {
   const [lei, setLei] = useState(mockLEI);
   const [insights, setInsights] = useState(mockInsights);
   const goals = user?.goals || [];
-  const userId = user?.userId || user?.clerkId;
 
   useEffect(() => {
     const h = new Date().getHours();
     setGreeting(h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening');
-    if (userId) {
-      getLEI(userId).then(data => { if (data) setLei(data); });
-      getInsights(userId).then(data => { if (data) setInsights(data); });
-    }
-  }, [refreshKey, userId]);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.userId) return;
+    getLEI(user.userId).then(data => { if (data) setLei(data); });
+    getInsights(user.userId).then(data => { if (data?.length) setInsights(data); });
+  }, [user?.userId, refreshKey]);
 
   const riskClass = lei.score >= 75 ? 'low' : lei.score >= 50 ? 'medium' : 'high';
   const numClass = lei.score >= 75 ? 'green' : lei.score >= 50 ? 'yellow' : 'red';
