@@ -2,6 +2,7 @@ package com.learnos.learnos_backend.controller;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -13,9 +14,12 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class QuizController {
 
-    private static final String API_KEY = "AIzaSyAJf6d731VJEJWUrdNT5cTO1FEZW3OpGB8"; // replace with your key
-    private static final String GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY;
+    @Value("${gemini.api.key}")
+    private String apiKey;
+
+    private String getGeminiUrl() {
+        return "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    }
 
     @PostMapping("/generate")
     public Map<String, Object> generateQuiz(@RequestBody Map<String, Object> body) {
@@ -60,7 +64,7 @@ public class QuizController {
 
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(GEMINI_URL))
+                    .uri(URI.create(getGeminiUrl()))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
                     .build();
