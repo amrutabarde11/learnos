@@ -1,6 +1,11 @@
 package com.learnos.learnos_backend.controller;
 
+import com.learnos.learnos_backend.models.UserEntity;
+import com.learnos.learnos_backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.*;
 
 @RestController
@@ -8,55 +13,84 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class UserController {
 
-    // In-memory store for now (we'll add database later)
-    private static Map<String, Object> currentUser = null;
-    private static List<Map<String, Object>> userGoals = new ArrayList<>();
+    @Autowired
+    private UserRepository userRepository;
+
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @GetMapping("/me")
-    public Map<String, Object> getUser() {
-        if (currentUser == null) {
-            return Map.of("exists", false);
+    public Map<String, Object> getUser(@RequestParam String userId) {
+        Optional<UserEntity> opt = userRepository.findById(userId);
+        if (opt.isEmpty()) return Map.of("exists", false);
+        UserEntity u = opt.get();
+        Map<String, Object> res = new HashMap<>();
+        res.put("exists", true);
+        res.put("clerkId", u.getClerkId());
+        res.put("name", u.getName());
+        res.put("learnerType", u.getLearnerType());
+        res.put("dailyTarget", u.getDailyTarget());
+        try {
+            List<?> goals = mapper.readValue(u.getGoalsJson() != null ? u.getGoalsJson() : "[]", List.class);
+            res.put("goals", goals);
+        } catch (Exception e) {
+            res.put("goals", List.of());
         }
-        Map<String, Object> response = new HashMap<>(currentUser);
-        response.put("exists", true);
-        response.put("goals", userGoals);
-        return response;
+        return res;
     }
 
     @PostMapping("/setup")
     public Map<String, Object> setupUser(@RequestBody Map<String, Object> body) {
-        currentUser = new HashMap<>();
-        currentUser.put("name", body.get("name"));
-        currentUser.put("learnerType", body.get("learnerType"));
-        currentUser.put("dailyTarget", body.get("dailyTarget"));
+        String userId = (String) body.get("userId");
+        if (userId == null) return Map.of("success", false, "error", "userId required");
 
-        // Save goals if provided
-        if (body.containsKey("goals")) {
-            userGoals = (List<Map<String, Object>>) body.get("goals");
+        UserEntity u = userRepository.findById(userId).orElse(new UserEntity());
+        u.setClerkId(userId);
+        u.setName((String) body.getOrDefault("name", "Learner"));
+        u.setLearnerType((String) body.getOrDefault("learnerType", "BOTH"));
+        Object dt = body.get("dailyTarget");
+        u.setDailyTarget(dt != null ? Double.parseDouble(dt.toString()) : 2.0);
+
+        try {
+            Object goals = body.get("goals");
+            u.setGoalsJson(goals != null ? mapper.writeValueAsString(goals) : "[]");
+        } catch (Exception e) {
+            u.setGoalsJson("[]");
         }
 
-        return Map.of(
-                "success", true,
-                "message", "Welcome to LearnOS, " + body.get("name") + "!"
-        );
-    }
-
-    @PostMapping("/reset")
-    public Map<String, Object> resetUser() {
-        currentUser = null;
-        userGoals = new ArrayList<>();
-        return Map.of("success", true);
+        userRepository.save(u);
+        return Map.of("success", true, "message", "Welcome to LearnOS, " + u.getName() + "!");
     }
 
     @GetMapping("/goals")
-    public List<Map<String, Object>> getGoals() {
-        return userGoals;
+    public List<?> getGoals(@RequestParam String userId) {
+        Optional<UserEntity> opt = userRepository.findById(userId);
+        if (opt.isEmpty()) return List.of();
+        try {
+            return mapper.readValue(opt.get().getGoalsJson() != null ? opt.get().getGoalsJson() : "[]", List.class);
+        } catch (Exception e) { return List.of(); }
     }
 
     @PostMapping("/goals")
-    public Map<String, Object> addGoal(@RequestBody Map<String, Object> goal) {
-        goal.put("id", userGoals.size() + 1);
-        userGoals.add(goal);
-        return Map.of("success", true, "goal", goal);
+    public Map<String, Object> addGoal(@RequestParam String userId, @RequestBody Map<String, Object> goal) {
+        Optional<UserEntity> opt = userRepository.findById(userId);
+        if (opt.isEmpty()) return Map.of("success", false, "error", "User not found");
+        UserEntity u = opt.get();
+        try {
+            List<Map> goals = new ArrayList<>(mapper.readValue(u.getGoalsJson() != null ? u.getGoalsJson() : "[]",
+                    mapper.getTypeFactory().constructCollectionType(List.class, Map.class)));
+            goal.put("id", System.currentTimeMillis());
+            goals.add(goal);
+            u.setGoalsJson(mapper.writeValueAsString(goals));
+            userRepository.save(u);
+            return Map.of("success", true, "goal", goal);
+        } catch (Exception e) {
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/reset")
+    public Map<String, Object> resetUser(@RequestParam String userId) {
+        userRepository.deleteById(userId);
+        return Map.of("success", true);
     }
 }

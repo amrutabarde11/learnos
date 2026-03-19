@@ -6,7 +6,6 @@ import LogSession from './pages/LogSession';
 import Reports from './pages/Reports';
 import MasteryMap from './pages/MasteryMap';
 import Sidebar from './components/Sidebar';
-import { mockGoals } from './api/data';
 import './App.css';
 
 const CATEGORIES = ['ACADEMIC','SKILL','CERTIFICATION','KNOWLEDGE'];
@@ -24,7 +23,7 @@ function Onboarding({ clerkUser, onComplete }) {
   const updateTopic = (i, field, val) => { const t = [...topics]; t[i] = { ...t[i], [field]: val }; setTopics(t); };
   const removeTopic = (i) => setTopics(topics.filter((_,idx) => idx !== i));
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const validTopics = topics.filter(t => t.name.trim());
     const firstGoal = {
       id: 1,
@@ -43,6 +42,13 @@ function Onboarding({ clerkUser, onComplete }) {
       goals: [firstGoal]
     };
     localStorage.setItem(`learnos_user_${clerkUser?.id}`, JSON.stringify(userData));
+    try {
+      await fetch((process.env.REACT_APP_API_URL || 'http://localhost:8080/api') + '/users/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+    } catch(e) { console.error('Could not sync user to backend', e); }
     onComplete(userData);
   };
 
@@ -179,12 +185,23 @@ function AppInner() {
   const [appUser, setAppUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+   useEffect(async () => {
     if (!user?.id) return;
     const stored = localStorage.getItem(`learnos_user_${user.id}`);
     if (stored) {
       setAppUser(JSON.parse(stored));
+      setLoading(false);
+      return;
     }
+    // Not in localStorage — try backend (new device)
+    try {
+      const r = await fetch((process.env.REACT_APP_API_URL || 'http://localhost:8080/api') + `/users/me?userId=${user.id}`);
+      const data = await r.json();
+      if (data.exists) {
+        localStorage.setItem(`learnos_user_${user.id}`, JSON.stringify(data));
+        setAppUser(data);
+      }
+    } catch(e) { console.error(e); }
     setLoading(false);
   }, [user?.id]);
 
