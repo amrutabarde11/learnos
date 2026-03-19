@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getLEI, getInsights, mockLEI, mockInsights } from '../api/data';
 
-
-
 function AgentBar({ name, score, color }) {
   return (
     <div className="agent-bar-wrap">
@@ -48,7 +46,7 @@ export default function Dashboard({ user, refreshKey }) {
   useEffect(() => {
     if (!user?.userId) return;
     getLEI(user.userId).then(data => { if (data) setLei(data); });
-    getInsights(user.userId).then(data => { if (data?.length) setInsights(data); });
+    getInsights(user.userId).then(data => { if (data && data.length) setInsights(data); });
   }, [user?.userId, refreshKey]);
 
   const riskClass = lei.score >= 75 ? 'low' : lei.score >= 50 ? 'medium' : 'high';
