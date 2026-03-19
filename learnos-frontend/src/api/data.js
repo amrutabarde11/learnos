@@ -1,4 +1,4 @@
-onst API = process.env.REACT_APP_API_URL || 'https://learnos-production.up.railway.app/api';
+const API = process.env.REACT_APP_API_URL || 'https://learnos-production.up.railway.app/api';
 
 export async function getLEI(userId) {
   try {
@@ -80,10 +80,6 @@ export const mockInsights = [
   { id: 2, type: 'GOAL_RISK', severity: 'warning', message: 'Add topics to your goals so the system can track your mastery over time.' },
 ];
 
-export const mockUser = {
-  name: 'Learner',
-  learnerType: 'BOTH',
-  dailyTarget: 2,
-};
+export const mockUser = { name: 'Learner', learnerType: 'BOTH', dailyTarget: 2 };
 
 export const mockGoals = [];
