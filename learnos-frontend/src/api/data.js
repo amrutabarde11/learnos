@@ -1,4 +1,4 @@
-﻿const API = process.env.REACT_APP_API_URL || 'https://learnos-production.up.railway.app/api';
+onst API = process.env.REACT_APP_API_URL || 'https://learnos-production.up.railway.app/api';
 
 export async function getLEI(userId) {
   try {
