@@ -1,6 +1,7 @@
-import { mockInsights, mockLEI, getLEI, getInsights } from '../api/data';
 import React, { useState, useEffect } from 'react';
 import { getLEI, getInsights, mockLEI, mockInsights } from '../api/data';
+
+
 
 function AgentBar({ name, score, color }) {
   return (
