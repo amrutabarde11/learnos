@@ -199,8 +199,9 @@ useEffect(() => {
       const r = await fetch((process.env.REACT_APP_API_URL || 'http://localhost:8080/api') + `/users/me?userId=${user.id}`);
       const data = await r.json();
       if (data.exists) {
-        localStorage.setItem(`learnos_user_${user.id}`, JSON.stringify(data));
-        setAppUser(data);
+        const normalized = { ...data, userId: user.id };
+        localStorage.setItem(`learnos_user_${user.id}`, JSON.stringify(normalized));
+        setAppUser(normalized);
       }
     } catch(e) { console.error(e); }
     setLoading(false);
