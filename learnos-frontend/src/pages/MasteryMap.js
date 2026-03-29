@@ -1,5 +1,4 @@
 import React from 'react';
-import { mockGoals } from '../api/data';
 
 const MASTERY_SHORT = {
   UNAWARE: 'UNA',
@@ -19,7 +18,22 @@ const MASTERY_DESC = {
   MASTERED: "Can teach it, handle edge cases",
 };
 
-export default function MasteryMap() {
+export default function MasteryMap({ user }) {
+  // FIX: use real goals from user prop, not mockGoals
+  const goals = user?.goals || [];
+
+  if (goals.length === 0) {
+    return (
+      <div className="fade-up" style={{ textAlign: 'center', padding: '80px 20px' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>◎</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--text-secondary)', marginBottom: 8 }}>No goals yet</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Add goals to see your mastery map.</div>
+      </div>
+    );
+  }
+
+  const allTopics = goals.flatMap(g => g.topics || []);
+
   return (
     <div className="fade-up">
       <div className="page-header">
@@ -43,48 +57,53 @@ export default function MasteryMap() {
       </div>
 
       {/* Goal Maps */}
-      {mockGoals.map(g => (
-        <div key={g.id} className="card fade-up" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <span className={`goal-category category-${g.category}`}>{g.category}</span>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--text-primary)' }}>{g.title}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-muted)' }}>
-              {g.progress}% to {g.targetMastery}
-            </span>
-          </div>
+      {goals.map((g, gi) => {
+        const done = g.topics?.filter(t => ['COMPETENT','PROFICIENT','MASTERED'].includes(t.mastery)).length || 0;
+        const total = g.topics?.length || 1;
+        const progress = Math.round((done / total) * 100);
+        return (
+          <div key={g.id || gi} className="card fade-up" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <span className={`goal-category category-${g.category}`}>{g.category}</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--text-primary)' }}>{g.title}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-muted)' }}>
+                {progress}% to {g.targetMastery}
+              </span>
+            </div>
 
-          {/* Topic grid */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {g.topics.map(t => (
-              <div key={t.name} style={{ textAlign: 'center', minWidth: 90 }}>
-                <div
-                  className={`mastery-cell ${t.mastery}`}
-                  style={{ width: '100%', height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, marginBottom: 6, fontSize: 11 }}
-                  title={`${t.name}: ${t.mastery} — ${MASTERY_DESC[t.mastery]}`}
-                >
-                  {MASTERY_SHORT[t.mastery]}
+            {/* Topic grid */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {(g.topics || []).map((t, ti) => (
+                <div key={t.name || ti} style={{ textAlign: 'center', minWidth: 90 }}>
+                  <div
+                    className={`mastery-cell ${t.mastery}`}
+                    style={{ width: '100%', height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, marginBottom: 6, fontSize: 11 }}
+                    title={`${t.name}: ${t.mastery} — ${MASTERY_DESC[t.mastery]}`}
+                  >
+                    {MASTERY_SHORT[t.mastery]}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.3, maxWidth: 90 }}>{t.name}</div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.3, maxWidth: 90 }}>{t.name}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Progress bar */}
-          <div style={{ marginTop: 16 }}>
-            <div className="goal-progress-bar-track">
-              <div className="goal-progress-bar-fill" style={{ width: `${g.progress}%` }} />
+            {/* Progress bar */}
+            <div style={{ marginTop: 16 }}>
+              <div className="goal-progress-bar-track">
+                <div className="goal-progress-bar-fill" style={{ width: `${progress}%` }} />
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Summary stats */}
       <div className="card fade-up">
         <div className="section-title">Overall Mastery Distribution</div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {['UNAWARE', 'EXPOSED', 'FAMILIAR', 'COMPETENT', 'PROFICIENT', 'MASTERED'].map(level => {
-            const count = mockGoals.flatMap(g => g.topics).filter(t => t.mastery === level).length;
-            const total = mockGoals.flatMap(g => g.topics).length;
+            const count = allTopics.filter(t => t.mastery === level).length;
+            const total = allTopics.length;
             const pct = total ? Math.round((count / total) * 100) : 0;
             return (
               <div key={level} style={{ flex: '1 1 120px', textAlign: 'center' }}>

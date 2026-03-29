@@ -1,44 +1,113 @@
-import React from 'react';
-import { mockGoals, mockLEI, mockUser, mockInsights } from '../api/data';
+import React, { useState, useEffect } from 'react';
+import { getLEI, getInsights, getSessions } from '../api/data';
 
-export default function Reports() {
+const API = process.env.REACT_APP_API_URL || 'https://learnos-production.up.railway.app/api';
+
+export default function Reports({ user }) {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const riskClass = mockLEI.score >= 75 ? 'low' : mockLEI.score >= 50 ? 'medium' : 'high';
+  const goals = user?.goals || [];
+
+  const [lei, setLei] = useState(null);
+  const [insights, setInsights] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.userId) return;
+    const uid = user.userId;
+    Promise.all([
+      getLEI(uid),
+      getInsights(uid),
+      getSessions(uid),
+    ]).then(([l, ins, sess]) => {
+      if (l) setLei(l);
+      if (ins?.length) setInsights(ins);
+      if (sess?.length) setSessions(sess);
+      setLoading(false);
+    });
+  }, [user?.userId]);
+
+  // Build chart data: hours studied per day (last 14 days)
+  const chartData = (() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const hours = sessions
+        .filter(s => s.date === key)
+        .reduce((sum, s) => sum + (s.duration || 0), 0);
+      days.push({ key, label, hours });
+    }
+    return days;
+  })();
+
+  const maxHours = Math.max(...chartData.map(d => d.hours), 1);
+
+  // Topic mastery distribution from real sessions
+  const topicMastery = (() => {
+    const map = {};
+    sessions.forEach(s => {
+      if (s.topic && s.masteryAfter) {
+        map[s.topic] = s.masteryAfter;
+      }
+    });
+    return map;
+  })();
+
+  const riskClass = lei ? (lei.score >= 75 ? 'low' : lei.score >= 50 ? 'medium' : 'high') : 'high';
+  const score = lei?.score ?? 0;
+
+  // Mastery breakdown across goals + sessions
+  const allTopics = goals.flatMap(g => g.topics || []);
+  const progressingCount = allTopics.filter(t =>
+    ['COMPETENT','PROFICIENT','MASTERED'].includes(t.mastery)
+  ).length;
+  const urgentCount = insights.filter(i => i.severity === 'danger').length;
+  const totalHours = sessions.reduce((s, sess) => s + (sess.duration || 0), 0);
 
   const reportText = `
 LearnOS — Learning Efficiency Report
 Generated: ${now}
-Student: ${mockUser.name}
+Student: ${user?.name || 'Learner'}
 
 ═══════════════════════════════════════
-LEARNING EFFICIENCY INDEX: ${mockLEI.score}/100
+LEARNING EFFICIENCY INDEX: ${score}/100
 Risk Level: ${riskClass.toUpperCase()}
+Total Sessions: ${sessions.length}
+Total Hours Studied: ${totalHours.toFixed(1)}h
 ═══════════════════════════════════════
 
 AGENT SCORES
 ────────────────────────────────────────
-Productivity:       ${mockLEI.productivity}/100
-Mastery Velocity:   ${mockLEI.mastery}/100
-Retention:          ${mockLEI.retention}/100
-Topic Priority:     ${mockLEI.topicPriority}/100
-Deadline:           ${mockLEI.deadline}/100
-Goal Progress:      ${mockLEI.goalProgress}/100
-Cognitive Load:     ${mockLEI.cognitive}/100
-Motivation:         ${mockLEI.motivation}/100
+Productivity:       ${lei?.productivity ?? 0}/100
+Mastery Velocity:   ${lei?.mastery ?? 0}/100
+Retention:          ${lei?.retention ?? 0}/100
+Topic Priority:     ${lei?.topicPriority ?? 0}/100
+Deadline:           ${lei?.deadline ?? 0}/100
+Goal Progress:      ${lei?.goalProgress ?? 0}/100
+Cognitive Load:     ${lei?.cognitive ?? 0}/100
+Motivation:         ${lei?.motivation ?? 0}/100
 
 GOAL PROGRESS
 ────────────────────────────────────────
-${mockGoals.map(g => `${g.title} [${g.category}]: ${g.progress}%
-  Topics: ${g.topics.map(t => `${t.name} (${t.mastery})`).join(', ')}`).join('\n\n')}
+${goals.map(g => {
+  const done = g.topics?.filter(t => ['COMPETENT','PROFICIENT','MASTERED'].includes(t.mastery)).length || 0;
+  const total = g.topics?.length || 1;
+  const pct = Math.round((done / total) * 100);
+  return `${g.title} [${g.category}]: ${pct}%\n  Topics: ${g.topics?.map(t => `${t.name} (${t.mastery})`).join(', ') || 'none'}`;
+}).join('\n\n') || 'No goals added yet.'}
+
+RECENT SESSIONS (last 10)
+────────────────────────────────────────
+${sessions.slice(-10).reverse().map(s =>
+  `${s.date} | ${s.topic} | ${s.duration}h | ${s.sessionType} | ${s.masteryBefore}→${s.masteryAfter}${s.notes ? '\n  Notes: ' + s.notes : ''}`
+).join('\n') || 'No sessions logged yet.'}
 
 ACTIVE INSIGHTS
 ────────────────────────────────────────
-${mockInsights.map((ins, i) => `${i + 1}. [${ins.type}] ${ins.message}`).join('\n\n')}
-
-LEI Formula:
-  (Mastery Velocity × 0.30) + (Topic Coverage × 0.25) +
-  (Retention × 0.20) + (Consistency × 0.15) +
-  (Goal Progress × 0.10) − Cognitive Penalty
+${insights.map((ins, i) => `${i + 1}. [${ins.type}] ${ins.message}`).join('\n\n') || 'No insights yet.'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Generated by LearnOS — Personal Learning Intelligence
@@ -53,6 +122,14 @@ Generated by LearnOS — Personal Learning Intelligence
     a.click();
   };
 
+  if (loading) return (
+    <div className="fade-up" style={{ textAlign: 'center', padding: '80px 20px' }}>
+      <div style={{ fontSize: 40, marginBottom: 16, display: 'inline-block', animation: 'spin 1s linear infinite' }}>✦</div>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading your report...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   return (
     <div className="fade-up">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -60,32 +137,107 @@ Generated by LearnOS — Personal Learning Intelligence
           <h1 className="page-greeting">Learning <em>Report</em></h1>
           <p className="page-subtitle">Generated {now}</p>
         </div>
-        <button className="btn btn-primary" onClick={handleExport}>
-          ↓ Export .txt
-        </button>
+        <button className="btn btn-primary" onClick={handleExport}>↓ Export .txt</button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid-4" style={{ marginBottom: 24 }}>
         <div className="card fade-up" style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: mockLEI.score >= 75 ? 'var(--sage)' : mockLEI.score >= 50 ? 'var(--yellow)' : 'var(--rose)' }}>{mockLEI.score}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: score >= 75 ? 'var(--sage)' : score >= 50 ? 'var(--yellow)' : 'var(--rose)' }}>{score}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 4 }}>LEI Score</div>
         </div>
         <div className="card fade-up" style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: 'var(--navy)' }}>{mockGoals.length}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 4 }}>Active Goals</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: 'var(--navy)' }}>{sessions.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 4 }}>Sessions Logged</div>
         </div>
         <div className="card fade-up" style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: 'var(--lavender)' }}>
-            {mockGoals.flatMap(g => g.topics).filter(t => ['COMPETENT','PROFICIENT','MASTERED'].includes(t.mastery)).length}
-          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: 'var(--lavender)' }}>{progressingCount}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 4 }}>Topics Progressing</div>
         </div>
         <div className="card fade-up" style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: 'var(--rose)' }}>{mockInsights.filter(i => i.severity === 'urgent').length}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, color: urgentCount > 0 ? 'var(--rose)' : 'var(--sage)' }}>{urgentCount}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 4 }}>Urgent Alerts</div>
         </div>
       </div>
+
+      {/* Activity Chart - hours per day last 14 days */}
+      <div className="card fade-up" style={{ marginBottom: 24 }}>
+        <div className="section-title">Study Activity — Last 14 Days</div>
+        {sessions.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 14 }}>
+            No sessions logged yet. Log your first session to see your activity chart.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, paddingTop: 8 }}>
+            {chartData.map(d => (
+              <div key={d.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                  {d.hours > 0 ? `${d.hours.toFixed(1)}h` : ''}
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: `${Math.max(4, (d.hours / maxHours) * 90)}px`,
+                  background: d.hours > 0 ? 'var(--sage, #7A9E87)' : 'rgba(27,42,74,0.07)',
+                  borderRadius: 4,
+                  transition: 'height 0.6s ease',
+                }} />
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                  {d.label.split(' ')[1]}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Agent Scores */}
+      {lei && (
+        <div className="card fade-up" style={{ marginBottom: 24 }}>
+          <div className="section-title">Agent Scores</div>
+          {[
+            { name: 'Productivity',       val: lei.productivity },
+            { name: 'Mastery Velocity',   val: lei.mastery },
+            { name: 'Retention',          val: lei.retention },
+            { name: 'Topic Priority',     val: lei.topicPriority },
+            { name: 'Deadline',           val: lei.deadline },
+            { name: 'Goal Progress',      val: lei.goalProgress },
+            { name: 'Cognitive Load',     val: lei.cognitive },
+            { name: 'Motivation',         val: lei.motivation },
+          ].map(a => (
+            <div key={a.name} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                <span>{a.name}</span><span>{a.val}/100</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--cream-dark, #F0EBE0)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${a.val}%`, background: a.val >= 75 ? '#7A9E87' : a.val >= 50 ? '#C4A84F' : '#C9857A', borderRadius: 3, transition: 'width 0.8s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recent Sessions list */}
+      {sessions.length > 0 && (
+        <div className="card fade-up" style={{ marginBottom: 24 }}>
+          <div className="section-title">Recent Sessions</div>
+          {sessions.slice(-8).reverse().map((s, i) => (
+            <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--card-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{s.topic}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {s.goalTitle && <span>{s.goalTitle} · </span>}
+                  {s.sessionType} · {s.masteryBefore} → {s.masteryAfter}
+                </div>
+                {s.notes && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 2 }}>"{s.notes}"</div>}
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{s.duration}h</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.date}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Full Report Text */}
       <div className="card fade-up">
